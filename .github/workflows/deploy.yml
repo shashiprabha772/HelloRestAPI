@@ -1,0 +1,35 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Build application
+      run: ./mvnw clean package -DskipTests
+      
+    - name: Deploy to Heroku (Example)
+      # Uncomment and configure for Heroku deployment
+      # uses: akhileshns/heroku-deploy@v3.12.12
+      # with:
+      #   heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+      #   heroku_app_name: "your-app-name"
+      #   heroku_email: "your-email@example.com"
+      run: echo "Deployment step - configure your deployment target here"
+      
+    # Alternative: Deploy to AWS, Azure, or other cloud providers
+    # Add your deployment steps here

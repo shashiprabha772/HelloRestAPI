@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: hellorestapidb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: shashiPrabha@123
+      MYSQL_DATABASE: HelloRestAPI
+      MYSQL_USER: helloapiuser
+      MYSQL_PASSWORD: apipassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - hello-network
+
+  # Spring Boot Application
+  app:
+    build: .
+    container_name: hellorestapiapp
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/HelloRestAPI
+      SPRING_DATASOURCE_USERNAME: helloapiuser
+      SPRING_DATASOURCE_PASSWORD: apipassword
+    depends_on:
+      - mysql
+    networks:
+      - hello-network
+
+volumes:
+  mysql_data:
+
+networks:
+  hello-network:
+    driver: bridge

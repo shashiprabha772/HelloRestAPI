@@ -1,0 +1,101 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testpassword
+          MYSQL_DATABASE: HelloRestAPI
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Wait for MySQL to be ready
+      run: |
+        for i in {30..0}; do
+          if mysqladmin ping -h 127.0.0.1 --silent; then
+            break
+          fi
+          echo 'MySQL is unavailable - sleeping'
+          sleep 1
+        done
+        
+    - name: Setup test database
+      run: |
+        mysql -h 127.0.0.1 -u root -ptestpassword -e "CREATE DATABASE IF NOT EXISTS HelloRestAPI;"
+        
+    - name: Run tests
+      run: ./mvnw clean test
+      env:
+        SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/HelloRestAPI
+        SPRING_DATASOURCE_USERNAME: root
+        SPRING_DATASOURCE_PASSWORD: testpassword
+        
+    - name: Build application
+      run: ./mvnw clean compile
+      
+    - name: Package application
+      run: ./mvnw clean package -DskipTests
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: jar-artifact
+        path: target/*.jar
+
+  build-docker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Build JAR
+      run: ./mvnw clean package -DskipTests
+      
+    - name: Build Docker image
+      run: |
+        docker build -t hellorestapiapp:latest .
+        
+    # Uncomment if you want to push to Docker registry
+    # - name: Push to Docker Hub
+    #   run: |
+    #     echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+    #     docker push hellorestapiapp:latest
